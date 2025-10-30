@@ -62,10 +62,7 @@ Deno.serve(async (req: Request) => {
 
     const genAI = new GoogleGenerativeAI(geminiApiKey);
     const model = genAI.getGenerativeModel({
-      model: "gemini-1.5-flash",
-      generationConfig: {
-        apiVersion: "v1"
-      }
+      model: "gemini-1.5-flash"
     });
 
     const prompt = `この画像は小学1年生の算数プリントです。

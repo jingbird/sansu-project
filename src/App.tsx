@@ -6,6 +6,28 @@ import HintPage from './pages/HintPage';
 import CompletePage from './pages/CompletePage';
 import ErrorPage from './pages/ErrorPage';
 import LoadingPage from './pages/LoadingPage';
+import { analyzeWorksheet } from './services/worksheetAnalysis';
+
+interface Problem {
+  id: number;
+  text: string;
+  hints: Hint[];
+}
+
+interface Hint {
+  step: number;
+  visual: {
+    type: 'images';
+    items: VisualItem[];
+  };
+  text: string;
+}
+
+interface VisualItem {
+  src: string;
+  state: 'normal' | 'eaten' | 'new';
+  sparkle?: boolean;
+}
 
 type Screen = 'camera' | 'preview' | 'loading' | 'problems' | 'hints' | 'complete' | 'error';
 
@@ -137,27 +159,53 @@ const mockProblems = [
 function App() {
   const [currentScreen, setCurrentScreen] = useState<Screen>('camera');
   const [imageUrl, setImageUrl] = useState<string>('');
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [problems, setProblems] = useState<Problem[]>(mockProblems);
   const [selectedProblemId, setSelectedProblemId] = useState<number | null>(null);
   const [currentHintStep, setCurrentHintStep] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
 
-  const selectedProblem = mockProblems.find(p => p.id === selectedProblemId);
+  const selectedProblem = problems.find(p => p.id === selectedProblemId);
 
   const handleFileSelect = (file: File) => {
     const url = URL.createObjectURL(file);
     setImageUrl(url);
+    setImageFile(file);
     setCurrentScreen('preview');
   };
 
-  const handleConfirmImage = () => {
+  const handleConfirmImage = async () => {
+    if (!imageFile) {
+      handleError('画像ファイルが見つかりません');
+      return;
+    }
+
     setCurrentScreen('loading');
-    setTimeout(() => {
+
+    try {
+      const analyzedProblems = await analyzeWorksheet(imageFile);
+
+      if (!analyzedProblems || analyzedProblems.length === 0) {
+        handleError('問題が見つかりませんでした。もう一度撮影してください。');
+        return;
+      }
+
+      setProblems(analyzedProblems);
       setCurrentScreen('problems');
-    }, 2000);
+    } catch (error) {
+      console.error('Error analyzing worksheet:', error);
+      handleError(
+        error instanceof Error
+          ? error.message
+          : '画像の解析に失敗しました。もう一度お試しください。'
+      );
+    }
   };
 
   const handleRetake = () => {
     setImageUrl('');
+    setImageFile(null);
+    setProblems(mockProblems);
     setCurrentScreen('camera');
   };
 
@@ -213,7 +261,7 @@ function App() {
 
       {currentScreen === 'problems' && (
         <ProblemListPage
-          problems={mockProblems}
+          problems={problems}
           onSelectProblem={handleSelectProblem}
           onRetake={handleRetake}
         />
